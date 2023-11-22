@@ -2,7 +2,6 @@ import csv
 import ipaddress
 import importlib
 import glob
-import yaml
 import os
 import logging
 import sys
@@ -205,11 +204,9 @@ class MainWindow(QMainWindow):
         for file_path in self.file_paths:
             worker = CsvWorker(file_path, selected_plugins, self.selected_output_file, command_flags)
             worker.update_status.connect(self.update_status_message)
-            worker.finished.connect(self.cleanup_thread)
+            worker.finished.connect(self.handle_finished_worker)
             worker.start()
-
             self.worker_threads.append(worker)  # Keep a reference to the worker
-
 
 
 
@@ -221,22 +218,19 @@ class MainWindow(QMainWindow):
             self.status_bar.showMessage(message)
 
 
-    def cleanup_thread(self):
+    def handle_finished_worker(self):
         worker = self.sender()
         if worker:
             worker.deleteLater()
             self.worker_threads.remove(worker)
-
-    def on_worker_finished(self):
-        logging.debug("Worker finished signal received.")
-        if all(not worker.isRunning() for worker in self.worker_threads):
+        if all(not thread.isRunning() for thread in self.worker_threads):
             self.status_bar.showMessage("Analysis completed!")
 
     def closeEvent(self, event):
-        for worker in self.worker_threads:
-            if worker.isRunning():
-                worker.wait()
-        event.accept()
+            for worker in self.worker_threads:
+                if worker.isRunning():
+                    worker.wait()
+            event.accept()
 
 
 def main():

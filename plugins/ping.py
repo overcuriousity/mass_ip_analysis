@@ -30,7 +30,7 @@ def run(ip, command_flag=None):
     # Debug: Print the command output
     print(f"Command output for IP {ip}: {output}")
 
-    if success and "bytes from" in output:
+    if success and "rtt" in output:
         return f"{ip}: UP"
     else:
         return f"{ip}: DOWN"
