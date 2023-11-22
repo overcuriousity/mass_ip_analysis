@@ -41,6 +41,7 @@ def is_private_ip(ip):
     try:
         return ipaddress.ip_address(ip).is_private
     except ValueError:
+        logging.error(f"Invalid IP address: {ip}")
         return False
 
 def load_plugins(plugin_folder='plugins'):
@@ -84,11 +85,12 @@ class CsvWorker(QThread):
             reader = list(csv.reader(infile))
             total_lines = len(reader)
             writer = csv.writer(outfile)
-
             for current_line, row in enumerate(reader, 1):
+                logging.debug(f"Processing line {current_line}: {row}")
                 new_row = row.copy()
                 for ip in row:
                     if is_private_ip(ip):
+                        self.update_status.emit("Skipping", ip, current_line, total_lines)
                         continue
                     for plugin_name, plugin in self.plugins.items():
                         self.update_status.emit(plugin_name, ip, current_line, total_lines)
@@ -98,6 +100,8 @@ class CsvWorker(QThread):
                 writer.writerow(new_row)
 
             self.finished.emit()
+            logging.debug("CsvWorker finished processing.")
+
 
 
 
@@ -156,9 +160,6 @@ class MainWindow(QMainWindow):
 
         self.worker_threads = []  # Add this line to store references to worker threads
 
-    def on_custom_checkbox_state_changed(self, state):
-        self.custom_regex_field.setEnabled(state == Qt.Checked)
-
     def select_analysis_file(self):
         file_paths, _ = QFileDialog.getOpenFileNames(self, 'Open Files')
 
@@ -199,46 +200,43 @@ class MainWindow(QMainWindow):
         # Fetch command flags for each plugin
         command_flags = {name: self.command_flags[name].text() for name in self.plugins.keys()}
 
-        self.worker_threads.clear()  # Clear existing threads before starting new ones
+        self.worker_threads = [thread for thread in self.worker_threads if thread.isRunning()]
+
         for file_path in self.file_paths:
             worker = CsvWorker(file_path, selected_plugins, self.selected_output_file, command_flags)
             worker.update_status.connect(self.update_status_message)
-            worker.finished.connect(self.on_worker_finished)
-            worker.finished.connect(worker.deleteLater)  # Ensure thread is deleted after finishing
+            worker.finished.connect(self.cleanup_thread)
             worker.start()
 
             self.worker_threads.append(worker)  # Keep a reference to the worker
 
 
-    def process_csv(self, input_file, plugins, output_file, command_flags):
-        with open(input_file, newline='') as infile, open(output_file, 'w', newline='') as outfile:
-            reader = list(csv.reader(infile))  # Convert the iterator to a list to get the total number of lines
-            total_lines = len(reader)
-            writer = csv.writer(outfile)
 
-            for current_line, row in enumerate(reader, 1):  # Start counting from 1
-                new_row = row.copy()
-                for ip in row:
-                    if is_private_ip(ip):
-                        continue
-                    for plugin_name, plugin in plugins.items():
-                        self.update_status_message(plugin_name, ip, current_line, total_lines)
-                        command_flag = command_flags.get(plugin_name, "")
-                        result = execute_plugin(plugin, ip, command_flag)
-                        new_row.append(result)
-                writer.writerow(new_row)
-
-            self.update_status_message(None, None, 0, 0)
 
     def update_status_message(self, plugin_name, ip, current_line, total_lines):
-        if total_lines:  # Avoid division by zero
+        if current_line == 0 and total_lines == 0:
+            self.status_bar.clearMessage()  # Clear message when processing is done
+        else:
             message = f"Processing {plugin_name} on {ip} (Line {current_line} of {total_lines})"
             self.status_bar.showMessage(message)
-        else:
-            self.status_bar.clearMessage()
+
+
+    def cleanup_thread(self):
+        worker = self.sender()
+        if worker:
+            worker.deleteLater()
+            self.worker_threads.remove(worker)
 
     def on_worker_finished(self):
-        self.status_bar.showMessage("Processing complete.")
+        logging.debug("Worker finished signal received.")
+        if all(not worker.isRunning() for worker in self.worker_threads):
+            self.status_bar.showMessage("Analysis completed!")
+
+    def closeEvent(self, event):
+        for worker in self.worker_threads:
+            if worker.isRunning():
+                worker.wait()
+        event.accept()
 
 
 def main():
