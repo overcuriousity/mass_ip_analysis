@@ -22,7 +22,7 @@ def run(ip, command_flag=None):
     if command_flag:
         command = f"ping {command_flag} {ip}"
     else:
-        command = f"ping {ip}"
+        command = f"ping -c 1 {ip}"
 
     logging.debug(f'{command}')
     success, output = execute_command(command)
