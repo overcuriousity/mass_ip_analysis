@@ -10,6 +10,7 @@ This application is a PyQt5-based tool for analyzing IP addresses inside CSV fil
 - fast multithreading
 - status information during runs
 - can pass flags to the commands (e.G. nmap -sS)
+- displays your outbound ip for opsec
 
 ## Installation
 
