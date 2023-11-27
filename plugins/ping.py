@@ -9,7 +9,8 @@ def execute_command(command):
         result = subprocess.check_output(command, stderr=subprocess.STDOUT, shell=True)
         return True, result.decode('utf-8').strip()
     except subprocess.CalledProcessError as e:
-        return False, e.output.decode('utf-8').strip()
+        # Even if the ping command fails, it's a valid result for our purpose.
+        return True, e.output.decode('utf-8').strip()
 
 def run(ip, command_flag=None):
     """
@@ -23,19 +24,19 @@ def run(ip, command_flag=None):
     else:
         command = f"ping -c 1 {ip}"
 
-    logging.debug(f'{command}')
+    logging.debug(f'Executing command: {command}')
     success, output = execute_command(command)
-    
-    # Debug: Print the command output
-    logging.debug(f"Command output for IP {ip}: {output}")
 
+    # Determine the result based on the output
     if "rtt" in output:
         result_message = f"{ip}: UP"
     else:
         result_message = f"{ip}: DOWN"
 
+    if "0 received" or "not known" in output:
+        success=False
+        
     return {'success': success, 'result': result_message}
-
 
 if __name__ == "__main__":
     # Test the plugin
