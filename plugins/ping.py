@@ -1,6 +1,5 @@
 import subprocess
 import logging
-import ipaddress
 
 def execute_command(command):
     """
@@ -18,7 +17,6 @@ def run(ip, command_flag=None):
     The 'command_flag' can be used to modify the command behavior.
     """
 
-
     # Append command_flag if provided
     if command_flag:
         command = f"ping {command_flag} {ip}"
@@ -29,15 +27,18 @@ def run(ip, command_flag=None):
     success, output = execute_command(command)
     
     # Debug: Print the command output
-    print(f"Command output for IP {ip}: {output}")
+    logging.debug(f"Command output for IP {ip}: {output}")
 
     if success and "rtt" in output:
-        return f"{ip}: UP"
+        result_message = f"{ip}: UP"
     else:
-        return f"{ip}: DOWN"
+        result_message = f"{ip}: DOWN"
+
+    return {'success': success, 'result': result_message}
 
 
 if __name__ == "__main__":
     # Test the plugin
     test_ip = "8.8.8.8"
-    print(run(test_ip))
+    result = run(test_ip)
+    print(result)
