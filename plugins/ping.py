@@ -29,7 +29,7 @@ def run(ip, command_flag=None):
     # Debug: Print the command output
     logging.debug(f"Command output for IP {ip}: {output}")
 
-    if success and "rtt" in output:
+    if "rtt" in output:
         result_message = f"{ip}: UP"
     else:
         result_message = f"{ip}: DOWN"
