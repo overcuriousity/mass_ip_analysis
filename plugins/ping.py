@@ -9,8 +9,11 @@ def execute_command(command):
         result = subprocess.check_output(command, stderr=subprocess.STDOUT, shell=True)
         return True, result.decode('utf-8').strip()
     except subprocess.CalledProcessError as e:
-        # Even if the ping command fails, it's a valid result for our purpose.
-        return False, e.output.decode('utf-8').strip()
+        # Output if the ping command fails because host is down, which is information we want to pass to the main program:
+        if "DOWN" in result:
+            return True, e.output.decode('utf-8').strip()
+        else:
+            return False, e.output.decode('utf-8').strip()
 
 def run(ip, command_flag=None):
     """
