@@ -51,16 +51,16 @@ def load_plugins(plugin_folder='plugins'):
 
     return plugins
 
-def execute_plugin(plugin, ip_address, command_flag=None):
+def execute_plugin(plugin, entity, command_flag=None):
     try:
         if plugin['type'] == 'python':
             plugin_module = importlib.import_module(plugin['name'])
             if command_flag:
-                return True, plugin_module.run(ip_address, command_flag)
+                return True, plugin_module.run(entity, command_flag)
             else:
-                return True, plugin_module.run(ip_address)
+                return True, plugin_module.run(entity, command_flag=None)
     except Exception as e:
-        logging.error(f"Error executing plugin {plugin['name']} for IP {ip_address}: {e}")
+        logging.error(f"Error executing plugin {plugin['name']} for entity {entity}: {e}")
         return False, str(e)
 
 class IPFetcher(QThread):
@@ -189,6 +189,7 @@ class MainWindow(QMainWindow):
 
         # Styling for error messages
         self.error_label.setStyleSheet("color: red")
+        self.error_label.setText("Operation is nominal. Only use tools you are legally allowed to.")
 
         # Add labels to the status bar layout
         status_layout.addWidget(self.status_label)
