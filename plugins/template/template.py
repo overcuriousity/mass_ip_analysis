@@ -1,5 +1,16 @@
 # plugin_name.py
 
+
+def flatten_output(command):
+    """
+    Checks the return value of the plugin logic to match the expected file types of the main program. Leave unchanged. 
+    """
+    try:
+        result = subprocess.check_output(command, stderr=subprocess.STDOUT, shell=True)
+        return True, result.decode('utf-8').strip()
+    except subprocess.CalledProcessError as e:
+        return False, e.output.decode('utf-8').strip()
+
 def run(entity, command_flag):
     """
     Process an entity and return a result.
