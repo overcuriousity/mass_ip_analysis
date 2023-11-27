@@ -7,14 +7,14 @@ def execute_command(command):
     Executes a system command and returns the output.
     """
     try:
-        result = subprocess.check_output(command, stderr=subprocess.STDOUT, shell=True)
-        return True, result.decode('utf-8').strip()
+        result = subprocess.check_output(command, stderr=subprocess.STDOUT, shell=True) 
+        if "DOWN" in result:
+            return True, result.decode('utf-8').strip()  
+        else:     
+            return True, result.decode('utf-8').strip()
     except subprocess.CalledProcessError as e:
         # Output if the ping command fails because host is down, which is information we want to pass to the main program:
-        if "DOWN" in result:
-            return True, e.output.decode('utf-8').strip()
-        else:
-            return False, e.output.decode('utf-8').strip()
+        return False, e.output.decode('utf-8').strip()
 
 def run(ip, command_flag=None):
     """
@@ -30,10 +30,9 @@ def run(ip, command_flag=None):
 
     logging.debug(f'Executing command: {command}')
     success, output = execute_command(command)
-    logging.debug(f'success:{success},output:{output}')
 
     # Determine the result based on the output
-    if "rtt" in output:
+    if "rtt" in output and success == True:
         result_message = f"{ip}: UP"
     else:
         result_message = f"{ip}: DOWN"
