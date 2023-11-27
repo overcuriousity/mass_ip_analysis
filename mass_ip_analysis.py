@@ -1,4 +1,5 @@
 import csv
+import re
 import requests
 import ipaddress
 import importlib
@@ -6,18 +7,19 @@ import glob
 import os
 import logging
 import sys
+import yaml
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QFileDialog, QMessageBox, QCheckBox, QLineEdit, QStatusBar
+    QFileDialog, QMessageBox, QCheckBox, QLineEdit, QStatusBar, QComboBox, QTableWidget, QTableWidgetItem
 )
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, pyqtSlot
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 def import_required_packages():
     required_packages = [
-        'PyQt5', 'requests'
+        'PyQt5', 'requests', 'yaml', 're'
     ]
 
     missing_packages = []
@@ -36,13 +38,6 @@ def import_required_packages():
         sys.exit()
 
 import_required_packages()
-
-def is_private_ip(ip):
-    try:
-        return ipaddress.ip_address(ip).is_private
-    except ValueError:
-        logging.error(f"Invalid IP address: {ip}")
-        return False
 
 def load_plugins(plugin_folder='plugins'):
     plugins = {}
@@ -81,46 +76,53 @@ class IPFetcher(QThread):
 
 class CsvWorker(QThread):
     update_status = pyqtSignal(str, str, int, int)
+    update_table_signal = pyqtSignal(list, int)  # list of data and row number
     finished = pyqtSignal()
     error_occurred = pyqtSignal(str)  # Signal for reporting errors
-
-    def __init__(self, input_file, plugins, output_file, command_flags):
+    def __init__(self, input_file, plugins, output_file, command_flags, parser_config):
         super().__init__()
         self.input_file = input_file
         self.plugins = plugins
         self.output_file = output_file
         self.command_flags = command_flags
+        self.parser_regex = parser_config['regex']
+        self.parser_entity_type = parser_config['entity_type']
+    
 
     def run(self):
-        plugin_name = "DefaultPlugin"        
         try:
             with open(self.input_file, newline='') as infile, open(self.output_file, 'w', newline='') as outfile:
-                reader = list(csv.reader(infile))
-                total_lines = len(reader)
+                reader = csv.reader(infile)
                 writer = csv.writer(outfile)
+                headers = next(reader, None)  # Read the header row if it exists
 
-                for current_line, row in enumerate(reader, 1):
+                # Processing and updating headers
+                if headers:
+                    for plugin_name in self.plugins.keys():
+                        headers.append(f"{self.parser_entity_type}_{plugin_name}")
+                    writer.writerow(headers)
+
+                # Processing each line
+                for current_line, row in enumerate(reader, start=1 if headers else 0):
                     logging.debug(f"Processing line {current_line}: {row}")
-                    ip = None
-                    self.update_status.emit(plugin_name, ip, current_line, total_lines)
                     new_row = row.copy()
-                    for ip in row:
-                        if is_private_ip(ip):
-                            self.update_status.emit("Skipping", ip, current_line, total_lines)
-                            continue
-                        for plugin_name, plugin in self.plugins.items():
-                            command_flag = self.command_flags.get(plugin_name, "")  # Retrieve command flag here
-                            self.update_status.emit(plugin_name, ip, current_line, total_lines)
-                            success, result = execute_plugin(plugin, ip, command_flag)
-                            if not success:
-                                self.error_occurred.emit(result)
-                            new_row.append(result if success else "Error")
-                    writer.writerow(new_row)
 
-            self.finished.emit()
+                    for cell_index, cell in enumerate(row):
+                        matches = re.findall(self.parser_regex, cell)
+                        for match in matches:
+                            for plugin_name, plugin in self.plugins.items():
+                                self.update_status.emit(plugin_name, match, current_line, cell_index)
+                                success, result = execute_plugin(plugin, match, self.command_flags.get(plugin_name, ""))
+                                if success:
+                                    new_row.append(result)
+                                else:
+                                    self.error_occurred.emit(result)
+                    self.update_table_signal.emit(new_row, current_line - 1)
+                    writer.writerow(new_row)
+                self.finished.emit()
         except Exception as e:
             logging.error(f"Error in CsvWorker: {e}")
-            self.error_occurred.emit(f"CsvWorker Error: {e}")
+            self.error_occurred.emit(str(e))
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -129,23 +131,32 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(500, 400)  # Allow the window to be resized
 
         self.selected_output_file = None
+        self.parsers = self.load_parsers('parser')
         self.plugins = load_plugins('plugins')  # Load plugins from the 'plugins' folder
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
 
+        parser_label = QLabel("Select which entities to inspect:")
+        main_layout.addWidget(parser_label)
+        
+        self.create_parser_selector(main_layout)
+
         # Plugin layouts
         self.checkboxes = {}
         self.command_flags = {}
         for plugin_name in self.plugins.keys():
-            checkbox = QCheckBox(plugin_name)
+            checkbox = QCheckBox()
             command_flag_input = QLineEdit()
             self.checkboxes[plugin_name] = checkbox
             self.command_flags[plugin_name] = command_flag_input
-
+            plugin_label = QLabel(f"<a href='{plugin_name}'>{plugin_name}</a>")
+            plugin_label.setOpenExternalLinks(False)
+            plugin_label.linkActivated.connect(self.on_plugin_link_clicked)
             plugin_layout = QHBoxLayout()
             plugin_layout.addWidget(checkbox)
+            plugin_layout.addWidget(plugin_label)  # Add the label to the layout
             plugin_layout.addWidget(command_flag_input)
             main_layout.addLayout(plugin_layout)
 
@@ -197,6 +208,24 @@ class MainWindow(QMainWindow):
         self.ip_fetcher.ip_fetched.connect(self.update_ip_status)
         self.ip_fetcher.start()
 
+        # Table setup
+        self.table_widget = QTableWidget()
+        main_layout.addWidget(self.table_widget)
+
+    def load_parsers(self, parser_folder):
+        parsers = {}
+        parser_dir = os.path.join(os.path.dirname(__file__), parser_folder)
+        for yaml_file in glob.glob(os.path.join(parser_dir, '*.yaml')):
+            with open(yaml_file, 'r') as file:
+                parser_config = yaml.safe_load(file)
+                parsers[os.path.basename(yaml_file).split('.')[0]] = parser_config
+        return parsers   
+
+    def create_parser_selector(self, layout):
+        self.parser_selector = QComboBox()
+        self.parser_selector.addItems(self.parsers.keys())
+        layout.addWidget(self.parser_selector)     
+    
     def update_ip_status(self, ip):
         self.ip_status_label.setText(f"Current IP: {ip}")
 
@@ -230,6 +259,7 @@ class MainWindow(QMainWindow):
         self.error_label.setText(error_message)
 
     def start_analysis(self):
+        selected_parser = self.parsers[self.parser_selector.currentText()]
         selected_plugins = {name: plugin for name, plugin in self.plugins.items() if self.checkboxes[name].isChecked()}
         if not selected_plugins:
             QMessageBox.warning(self, 'Warning', 'No plugins selected for analysis.')
@@ -246,20 +276,38 @@ class MainWindow(QMainWindow):
         self.worker_threads = [thread for thread in self.worker_threads if thread.isRunning()]
 
         for file_path in self.file_paths:
-            worker = CsvWorker(file_path, selected_plugins, self.selected_output_file, command_flags)
+            worker = CsvWorker(file_path, selected_plugins, self.selected_output_file, command_flags, selected_parser)
             worker.update_status.connect(self.update_status_message)
+            worker.update_table_signal.connect(self.update_table)
             worker.error_occurred.connect(self.handle_plugin_error)
-            worker.finished.connect(self.handle_finished_worker)  # Ensure this connection is made
+            worker.finished.connect(self.handle_finished_worker)
             worker.start()
-            self.worker_threads.append(worker) 
+            self.worker_threads.append(worker)
 
 
-
-    def update_status_message(self, plugin_name, ip, current_line, total_lines):
-        status_message = f"Processing {plugin_name} on {ip} (Line {current_line} of {total_lines})"
+    def update_status_message(self, plugin_name, entity, current_line, cell_index):
+        status_message = f"Processing {plugin_name} on {entity} (Line {current_line}, Cell {cell_index})"
         self.status_label.setText(status_message)
 
+    @pyqtSlot(str)
+    def on_plugin_link_clicked(self, link):
+        self.display_plugin_description(link)
 
+    def display_plugin_description(self, plugin_name):
+        # Ensure the plugin name is not empty and correctly formatted
+        if not plugin_name:
+            QMessageBox.warning(self, "Error", "Invalid plugin name.")
+            return
+
+        yaml_file_path = os.path.join(os.path.dirname(__file__), f'plugins/{plugin_name}.yaml')
+        try:
+            with open(yaml_file_path, 'r') as file:
+                plugin_config = yaml.safe_load(file)
+                description = plugin_config.get('description', 'No description available.')
+                QMessageBox.information(self, f"{plugin_name} Description", description)
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Failed to load description for {plugin_name}: {e}")
+    
     def handle_finished_worker(self):
         worker = self.sender()
         if worker:
@@ -270,6 +318,17 @@ class MainWindow(QMainWindow):
         if not self.worker_threads:
             self.status_label.setText("Analysis completed!")  # Update the status label
 
+    def update_table(self, row_data, row_number):
+        current_row_count = self.table_widget.rowCount()
+        if row_number >= current_row_count:
+            self.table_widget.insertRow(row_number)
+
+        for col_number, cell_data in enumerate(row_data):
+            if col_number >= self.table_widget.columnCount():
+                self.table_widget.insertColumn(col_number)
+            item = QTableWidgetItem(cell_data)
+            self.table_widget.setItem(row_number, col_number, item)
+    
     def closeEvent(self, event):
             for worker in self.worker_threads:
                 if worker.isRunning():
