@@ -10,7 +10,7 @@ def execute_command(command):
         return True, result.decode('utf-8').strip()
     except subprocess.CalledProcessError as e:
         # Even if the ping command fails, it's a valid result for our purpose.
-        return True, e.output.decode('utf-8').strip()
+        return False, e.output.decode('utf-8').strip()
 
 def run(ip, command_flag=None):
     """
@@ -32,9 +32,6 @@ def run(ip, command_flag=None):
         result_message = f"{ip}: UP"
     else:
         result_message = f"{ip}: DOWN"
-
-    if "0 received" or "not known" in output:
-        success=False
         
     return {'success': success, 'result': result_message}
 
