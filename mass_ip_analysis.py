@@ -54,13 +54,11 @@ def execute_plugin(plugin, entity, command_flag=None):
     try:
         if plugin['type'] == 'python':
             plugin_module = importlib.import_module(plugin['name'])
-            if command_flag:
-                return True, plugin_module.run(entity, command_flag)
-            else:
-                return True, plugin_module.run(entity, command_flag=None)
+            return plugin_module.run(entity, command_flag)
     except Exception as e:
         logging.error(f"Error executing plugin {plugin['name']} for entity {entity}: {e}")
-        return False, str(e)
+        return {'success': False, 'result': str(e)}
+
 
 class IPFetcher(QThread):
     ip_fetched = pyqtSignal(str)
