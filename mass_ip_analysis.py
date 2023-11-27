@@ -1,7 +1,6 @@
 import csv
 import re
 import requests
-import ipaddress
 import importlib
 import glob
 import os
@@ -88,41 +87,51 @@ class CsvWorker(QThread):
         self.parser_regex = parser_config['regex']
         self.parser_entity_type = parser_config['entity_type']
     
-
     def run(self):
         try:
             with open(self.input_file, newline='') as infile, open(self.output_file, 'w', newline='') as outfile:
                 reader = csv.reader(infile)
                 writer = csv.writer(outfile)
-                headers = next(reader, None)  # Read the header row if it exists
-
-                # Processing and updating headers
-                if headers:
-                    for plugin_name in self.plugins.keys():
-                        headers.append(f"{self.parser_entity_type}_{plugin_name}")
-                    writer.writerow(headers)
-
-                # Processing each line
-                for current_line, row in enumerate(reader, start=1 if headers else 0):
-                    logging.debug(f"Processing line {current_line}: {row}")
-                    new_row = row.copy()
-
-                    for cell_index, cell in enumerate(row):
-                        matches = re.findall(self.parser_regex, cell)
-                        for match in matches:
-                            for plugin_name, plugin in self.plugins.items():
-                                self.update_status.emit(plugin_name, match, current_line, cell_index)
-                                success, result = execute_plugin(plugin, match, self.command_flags.get(plugin_name, ""))
-                                if success:
-                                    new_row.append(result)
-                                else:
-                                    self.error_occurred.emit(result)
-                    self.update_table_signal.emit(new_row, current_line - 1)
-                    writer.writerow(new_row)
+                self.process_csv(reader, writer)
                 self.finished.emit()
         except Exception as e:
             logging.error(f"Error in CsvWorker: {e}")
             self.error_occurred.emit(str(e))
+
+    def process_csv(self, reader, writer):
+        headers = next(reader, None)  # Read the header row if it exists
+        self.update_headers(headers, writer)
+
+        for current_line, row in enumerate(reader, start=1 if headers else 0):
+            logging.debug(f"Processing line {current_line}: {row}")
+            new_row = self.process_row(row, current_line)
+            self.update_table_signal.emit(new_row, current_line - 1)
+            writer.writerow(new_row)
+
+    def update_headers(self, headers, writer):
+        if headers:
+            for plugin_name in self.plugins.keys():
+                headers.append(f"{self.parser_entity_type}_{plugin_name}")
+            writer.writerow(headers)
+
+    def process_row(self, row, current_line):
+        new_row = row.copy()
+        for cell_index, cell in enumerate(row):
+            matches = re.findall(self.parser_regex, cell)
+            for match in matches:
+                new_row.extend(self.process_entity(match, current_line, cell_index))
+        return new_row
+
+    def process_entity(self, entity, current_line, cell_index):
+        results = []
+        for plugin_name, plugin in self.plugins.items():
+            self.update_status.emit(plugin_name, entity, current_line, cell_index)
+            plugin_result = execute_plugin(plugin, entity, self.command_flags.get(plugin_name, ""))
+            if plugin_result['success']:
+                results.append(plugin_result['result'])
+            else:
+                self.error_occurred.emit(plugin_result['result'])
+        return results
 
 class MainWindow(QMainWindow):
     def __init__(self):

@@ -1,5 +1,6 @@
 import subprocess
 import logging
+import ipaddress
 
 def execute_command(command):
     """
