@@ -54,7 +54,11 @@ def execute_plugin(plugin, entity, command_flag=None):
     try:
         if plugin['type'] == 'python':
             plugin_module = importlib.import_module(plugin['name'])
-            return plugin_module.run(entity, command_flag)
+            result = plugin_module.run(entity, command_flag)
+            if isinstance(result, dict) and 'success' in result and 'result' in result:
+                return result
+            else:
+                raise ValueError("Plugin returned data in an unexpected format")
     except Exception as e:
         logging.error(f"Error executing plugin {plugin['name']} for entity {entity}: {e}")
         return {'success': False, 'result': str(e)}
@@ -125,10 +129,13 @@ class CsvWorker(QThread):
         for plugin_name, plugin in self.plugins.items():
             self.update_status.emit(plugin_name, entity, current_line, cell_index)
             plugin_result = execute_plugin(plugin, entity, self.command_flags.get(plugin_name, ""))
-            if plugin_result['success']:
-                results.append(plugin_result['result'])
+            if isinstance(plugin_result, dict) and 'success' in plugin_result and 'result' in plugin_result:
+                if plugin_result['success']:
+                    results.append(plugin_result['result'])
+                else:
+                    self.error_occurred.emit(plugin_result['result'])
             else:
-                self.error_occurred.emit(plugin_result['result'])
+                self.error_occurred.emit("Plugin result format is incorrect")
         return results
 
 class MainWindow(QMainWindow):
