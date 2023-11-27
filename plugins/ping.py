@@ -1,5 +1,6 @@
 import subprocess
 import logging
+import ipaddress
 
 def execute_command(command):
     """
@@ -29,6 +30,7 @@ def run(ip, command_flag=None):
 
     logging.debug(f'Executing command: {command}')
     success, output = execute_command(command)
+    logging.debug(f'success:{success},output:{output}')
 
     # Determine the result based on the output
     if "rtt" in output:
