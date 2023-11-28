@@ -1,5 +1,8 @@
 import subprocess
 import logging
+import ipaddress
+import datetime
+from datetime import datetime, timezone
 
 def execute_command(command):
     """
@@ -17,23 +20,27 @@ def run(ip, command_flag=None):
     Main function to be called by the plugin system.
     The 'command_flag' can be used to modify the command behavior.
     """
+    try:
+        ip_obj = ipaddress.ip_address(ip)
+        if ip_obj.is_global:
+            # Append command_flag if provided
+            command = f"ping {command_flag} {ip}" if command_flag else f"ping -c 1 {ip}"
+            logging.debug(f'Executing command: {command}')
+            success, output = execute_command(command)
+            ct = datetime.now(timezone.utc)
+            ct = ct.strftime('%Y-%m-%d %H:%M:%S')
+            # Determine the result based on the output
+            if "rtt" in output:               
+                result_message = f"{ip}: UP at {ct}"
+            else:
+                result_message = f"{ip}: DOWN at {ct}"
+        else:
+            success = True
+            result_message = f"{ip} is in a private address range, skipped"
 
-    # Append command_flag if provided
-    if command_flag:
-        command = f"ping {command_flag} {ip}"
-    else:
-        command = f"ping -c 1 {ip}"
-
-    logging.debug(f'Executing command: {command}')
-    success, output = execute_command(command)
-
-    # Determine the result based on the output
-    if "rtt" in output:
-        result_message = f"{ip}: UP"
-    else:
-        result_message = f"{ip}: DOWN"
-
-    return {'success': success, 'result': result_message}
+        return {'success': success, 'result': result_message}
+    except ValueError:
+        return {'success': False, 'result': f"{ip} is not a valid IP address"}
 
 if __name__ == "__main__":
     # Test the plugin
