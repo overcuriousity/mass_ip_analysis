@@ -5,7 +5,7 @@ if command -v apt-get >/dev/null 2>&1; then
     echo "apt-get is available."
 
     # Check if Python packages are installed
-    if ! dpkg -s python3 python3.11-venv python3-pip >/dev/null 2>&1; then
+    if ! dpkg -s python3 python3-venv python3-pip >/dev/null 2>&1; then
         echo "Python packages are not installed."
         read -p "Do you want to install python3, python3-venv, and python3-pip? [y/N] " response
         if [[ "$response" =~ ^[Yy]$ ]]; then
@@ -49,3 +49,4 @@ else
     echo "running script as root"
     sudo python3 mass_ip_analysis.py
 fi
+python3 mass_ip_analysis.py
