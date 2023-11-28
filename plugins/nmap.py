@@ -1,5 +1,8 @@
 import subprocess
 import logging
+import ipaddress
+import datetime
+from datetime import datetime, timezone
 
 def execute_command(command):
     """
@@ -16,16 +19,21 @@ def run(ip, command_flag=None):
     Main function to be called by the plugin system.
     The 'command_flag' can be used to modify the command behavior.
     """
+    ip_obj = ipaddress.ip_address(ip)
+    if ip_obj.is_global:
+        # Append command_flag if provided
+        command = f"nmap {command_flag} {ip}" if command_flag else f"nmap {ip}"
+        logging.debug(f'Executing command: {command}')
+        
+        success, output = execute_command(command)
+        logging.debug(f"Command output for IP {ip}: {output}")
 
-    # Append command_flag if provided
-    command = f"nmap {command_flag} {ip}" if command_flag else f"nmap {ip}"
-    logging.debug(f'Executing command: {command}')
-    
-    success, output = execute_command(command)
-    logging.debug(f"Command output for IP {ip}: {output}")
-
-    # Following the standardized format
-    return {'success': success, 'result': output}
+        # Following the standardized format
+        return {'success': success, 'result': output}
+    else:
+        success = True
+        output = f"{ip} is in a private address range, skipped"
+        return {'success': success, 'result': output}
 
 if __name__ == "__main__":
     # Test the plugin
