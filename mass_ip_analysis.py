@@ -96,6 +96,7 @@ class CsvWorker(QThread):
                 writer = csv.writer(outfile)
                 self.process_csv(reader, writer)
                 self.finished.emit()
+                logging.debug(f"finished processing csv")
         except Exception as e:
             logging.error(f"Error in CsvWorker: {e}")
             self.error_occurred.emit(str(e))
@@ -288,14 +289,12 @@ class MainWindow(QMainWindow):
         # Fetch command flags for each plugin
         command_flags = {name: self.command_flags[name].text() for name in self.plugins.keys()}
 
-        self.worker_threads = [thread for thread in self.worker_threads if thread.isRunning()]
-
         for file_path in self.file_paths:
             worker = CsvWorker(file_path, selected_plugins, self.selected_output_file, command_flags, selected_parser)
             worker.update_status.connect(self.update_status_message)
             worker.update_table_signal.connect(self.update_table)
             worker.error_occurred.connect(self.handle_plugin_error)
-            worker.finished.connect(self.handle_finished_worker)
+            worker.finished.connect(self.on_worker_finished)  # Connect finished signal
             worker.start()
             self.worker_threads.append(worker)
 
@@ -307,6 +306,17 @@ class MainWindow(QMainWindow):
     @pyqtSlot(str)
     def on_plugin_link_clicked(self, link):
         self.display_plugin_description(link)
+
+    @pyqtSlot()
+    def on_worker_finished(self):
+        # Safely remove and delete finished workers
+        for worker in self.worker_threads[:]:
+            if not worker.isRunning():
+                self.worker_threads.remove(worker)
+                worker.deleteLater()
+
+        if not self.worker_threads:
+            self.status_label.setText("Analysis completed!")
 
     def display_plugin_description(self, plugin_name):
         # Ensure the plugin name is not empty and correctly formatted
