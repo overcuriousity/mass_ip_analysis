@@ -31,9 +31,9 @@ def run(ip, command_flag=None):
             ct = ct.strftime('%Y-%m-%d %H:%M:%S')
             # Determine the result based on the output
             if "rtt" in output:               
-                result_message = f"{ip}: UP at {ct}"
+                result_message = f"{ip}: UP at {ct} (UTC)"
             else:
-                result_message = f"{ip}: DOWN at {ct}"
+                result_message = f"{ip}: DOWN at {ct} (UTC)"
         else:
             success = True
             result_message = f"{ip} is in a private address range, skipped"

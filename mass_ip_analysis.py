@@ -91,15 +91,16 @@ class CsvWorker(QThread):
     
     def run(self):
         try:
+            self.max_input_cols = self.find_max_columns(self.input_file)
             with open(self.input_file, newline='') as infile, open(self.output_file, 'w', newline='') as outfile:
                 reader = csv.reader(infile)
                 writer = csv.writer(outfile)
                 self.process_csv(reader, writer)
                 self.finished.emit()
-                logging.debug(f"finished processing csv")
+                logging.debug("finished processing csv")
         except Exception as e:
-            logging.error(f"Error in CsvWorker: {e}")
             self.error_occurred.emit(str(e))
+
 
     def process_csv(self, reader, writer):
         headers = next(reader, None)  # Read the header row if it exists
@@ -111,19 +112,47 @@ class CsvWorker(QThread):
             self.update_table_signal.emit(new_row, current_line - 1)
             writer.writerow(new_row)
 
+    def find_max_columns(self, file_name):
+        max_cols = 0
+        with open(file_name, newline='') as f:
+            reader = csv.reader(f)
+            for row in reader:
+                max_cols = max(max_cols, len(row))
+        return max_cols
+
     def update_headers(self, headers, writer):
         if headers:
-            for plugin_name in self.plugins.keys():
-                headers.append(f"{self.parser_entity_type}_{plugin_name}")
+            headers += [''] * (self.max_input_cols - len(headers))  # Pad headers if needed
+            for plugin_name, command_flag in self.command_flags.items():
+                headers.append(f"{plugin_name} ({command_flag})")
             writer.writerow(headers)
 
     def process_row(self, row, current_line):
-        new_row = row.copy()
-        for cell_index, cell in enumerate(row):
+        original_length = len(row)
+        row.extend([''] * (self.max_input_cols - original_length))  # Pad row to max columns
+        row.extend([''] * len(self.plugins))  # Extend row for plugin results
+
+        for cell_index, cell in enumerate(row[:original_length]):
             matches = re.findall(self.parser_regex, cell)
             for match in matches:
-                new_row.extend(self.process_entity(match, current_line, cell_index))
-        return new_row
+                for plugin_index, (plugin_name, plugin) in enumerate(self.plugins.items()):
+                    result_index = self.max_input_cols + plugin_index
+                    self.update_status.emit(plugin_name, match, current_line, cell_index)
+                    plugin_result = execute_plugin(plugin, match, self.command_flags.get(plugin_name, ""))
+                    row[result_index] = self.format_plugin_result(plugin_result)
+
+        return row
+
+
+    
+    @staticmethod
+    def format_plugin_result(plugin_result):
+        if isinstance(plugin_result, dict) and 'success' in plugin_result and 'result' in plugin_result:
+            if plugin_result['success']:
+                return str(plugin_result['result'])
+            else:
+                return f"Error: {plugin_result['result']}"
+        return "Invalid format"
 
     def process_entity(self, entity, current_line, cell_index):
         results = []
