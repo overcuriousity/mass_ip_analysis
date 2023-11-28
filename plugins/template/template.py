@@ -1,5 +1,16 @@
 # plugin_name.py
 
+
+def flatten_output(command):
+    """
+    Checks the return value of the plugin logic to match the expected file types of the main program. Leave unchanged. 
+    """
+    try:
+        result = subprocess.check_output(command, stderr=subprocess.STDOUT, shell=True)
+        return True, result.decode('utf-8').strip()
+    except subprocess.CalledProcessError as e:
+        return False, e.output.decode('utf-8').strip()
+
 def run(entity, command_flag):
     """
     Process an entity and return a result.
@@ -15,17 +26,17 @@ def run(entity, command_flag):
     """
     
     try:
-        # Plugin logic goes here
+        # Plugin-specific logic goes here.
         # For example, if this is an IP address plugin,
-        # you might ping the IP address and return the response time.
-      # Part of CsvWorker or wherever the plugin is executed
+        # you might perform an operation like pinging the IP address
+        # and return the response time or any other relevant information.
 
-  
+        # Example of processed result (modify according to actual plugin logic)
+        processed_result = f"Processed result for {entity} with command flag {command_flag}"
 
-        processed_result = "Processed result based on entity and command_flag"
-
+        # Return the result in the standardized format
         return {'success': True, 'result': processed_result}
 
     except Exception as e:
-        # Handle any exceptions and return an error message
+        # Handle any exceptions and return an error message in the same format
         return {'success': False, 'result': str(e)}

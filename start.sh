@@ -42,4 +42,11 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # Run the Python script
+if [[ $EUID -ne 0 ]]; then
+    echo "starting script as $USER"
+    python3 mass_ip_analysis.py
+else
+    echo "running script as root"
+    sudo python3 mass_ip_analysis.py
+fi
 python3 mass_ip_analysis.py
