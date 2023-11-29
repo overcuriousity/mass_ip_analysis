@@ -51,6 +51,9 @@ def load_plugins(plugin_folder='plugins'):
     return plugins
 
 def execute_plugin(plugin, entity, command_flag=None):
+    if 'name' not in plugin:
+        logging.error(f"'name' key not found in plugin data: {plugin}")
+        return {'success': False, 'result': 'Plugin configuration error'}
     try:
         if plugin['type'] == 'python':
             plugin_module = importlib.import_module(plugin['name'])
@@ -62,6 +65,7 @@ def execute_plugin(plugin, entity, command_flag=None):
     except Exception as e:
         logging.error(f"Error executing plugin {plugin['name']} for entity {entity}: {e}")
         return {'success': False, 'result': str(e)}
+
 
 
 class IPFetcher(QThread):
