@@ -1,0 +1,1 @@
+description: "Runs whois on the up address and if possible, reduces the output to relevant parts. Rate-limiting is handled by cycling whois servers and waiting periods in case of failure. Make sure that the whois system command is available on your system."
