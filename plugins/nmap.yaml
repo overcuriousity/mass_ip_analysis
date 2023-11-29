@@ -1,2 +1,5 @@
+ui_descriptor: "Portscan via nmap"
+plugin_base_name: "nmap"
+exec_order: 1000
 description: "This is a detailed description of what the plugin does and how it works."
-
+eligible_parsers: ["parser1", "parser2"]

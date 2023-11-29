@@ -1,5 +1,5 @@
-ui_descriptor: "WHOIS"
-plugin_base_name: "whois"
-exec_order: 1
+ui_descriptor: "Geolocation"
+plugin_base_name: "geoip"
+exec_order: 100
 description: "This is a detailed description of what the plugin does and how it works."
 eligible_parsers: ["parser1", "parser2"]
