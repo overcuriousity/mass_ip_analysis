@@ -23,6 +23,7 @@ This application is a PyQt5-based tool for analyzing IP addresses inside CSV fil
 
 
 
+
 *Manual install:*
 
 1. Clone the Repository:
