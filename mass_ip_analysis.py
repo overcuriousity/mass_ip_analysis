@@ -46,14 +46,23 @@ def load_plugins(plugin_folder='plugins'):
         plugin_base_name = os.path.basename(py_file)[:-3]
         plugin_path = os.path.relpath(py_file, os.path.dirname(__file__))
         plugin_name = plugin_path.replace(os.sep, '.')[:-3]
-        plugins[plugin_base_name] = {'type': 'python', 'name': plugin_name}
 
-    return plugins
+        # Read exec_order from the corresponding YAML file
+        yaml_file = os.path.join(plugin_dir, plugin_base_name + '.yaml')
+        if os.path.exists(yaml_file):
+            with open(yaml_file, 'r') as file:
+                plugin_config = yaml.safe_load(file)
+                exec_order = plugin_config.get('exec_order', 0)
+        else:
+            exec_order = 0
+
+        plugins[plugin_base_name] = {'type': 'python', 'name': plugin_name, 'exec_order': exec_order}
+
+    # Sort plugins based on exec_order
+    sorted_plugins = dict(sorted(plugins.items(), key=lambda item: item[1]['exec_order']))
+    return sorted_plugins
 
 def execute_plugin(plugin, entity, command_flag=None):
-    if 'name' not in plugin:
-        logging.error(f"'name' key not found in plugin data: {plugin}")
-        return {'success': False, 'result': 'Plugin configuration error'}
     try:
         if plugin['type'] == 'python':
             plugin_module = importlib.import_module(plugin['name'])
@@ -65,7 +74,6 @@ def execute_plugin(plugin, entity, command_flag=None):
     except Exception as e:
         logging.error(f"Error executing plugin {plugin['name']} for entity {entity}: {e}")
         return {'success': False, 'result': str(e)}
-
 
 
 class IPFetcher(QThread):
