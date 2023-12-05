@@ -1,5 +1,5 @@
 ui_descriptor: "WHOIS"
 plugin_base_name: "whois"
 exec_order: 1
-description: "This is a detailed description of what the plugin does and how it works."
+description: "Does a simple ping which returns a result either if the host is up or down. No flags necessary, which does a single ping and returns the result in a easily readable format."
 eligible_parsers: ["parser1", "parser2"]
