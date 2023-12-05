@@ -19,9 +19,8 @@ This application is a PyQt5-based tool for analyzing IP addresses inside CSV fil
 
 *Easy install:*
 
-    git clone https://github.com/overcuriousity/mass_ip_analysis.git   
-    cd mass_ip_analysis && cd mass_ip_analysis && sudo chmod +x start.sh
-    && sudo ./start.sh
+    git clone https://github.com/overcuriousity/mass_ip_analysis.git && cd mass_ip_analysis && sudo chmod +x start.sh && sudo ./start.sh
+
 
 
 *Manual install:*
