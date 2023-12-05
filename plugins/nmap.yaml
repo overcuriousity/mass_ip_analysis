@@ -1,5 +1,5 @@
 ui_descriptor: "Portscan via nmap"
 plugin_base_name: "nmap"
 exec_order: 1000
-description: "This is a detailed description of what the plugin does and how it works."
+description: "The command performs a portscan to discover open ports or various useful information on an IP address. Flags are important, example: -sS	nmap 192.168.1.1 -sS	TCP SYN port scan (Default); -sT	nmap 192.168.1.1 -sT	TCP connect port scan (Default without root privilege); -sU	nmap 192.168.1.1 -sU	UDP port scan; -sA	nmap 192.168.1.1 -sA	TCP ACK port scan; -sW	nmap 192.168.1.1 -sW	TCP Window port scan-sM	nmap 192.168.1.1 -sM	TCP Maimon port scan"; 
 eligible_parsers: ["parser1", "parser2"]
