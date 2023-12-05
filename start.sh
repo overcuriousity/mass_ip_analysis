@@ -49,4 +49,4 @@ else
     echo "running script as root"
     sudo python3 mass_ip_analysis.py
 fi
-python3 mass_ip_analysis.py
+
